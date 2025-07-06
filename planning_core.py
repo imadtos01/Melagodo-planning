@@ -1,8 +1,7 @@
 import pandas as pd
 from ortools.sat.python import cp_model
-import os
 
-def generate_planning(num_workers, weekly_chef_need, output_path="planning.xlsx"):
+def generate_planning(num_workers, weekly_chef_need):
     DAYS = 7
     HOURS_PER_DAY = 14
     START_HOUR = 10
@@ -24,7 +23,6 @@ def generate_planning(num_workers, weekly_chef_need, output_path="planning.xlsx"
             model.Add(sum(shifts[w][idx(d,h)] for h in range(HOURS_PER_DAY)) >= 1).OnlyEnforceIf(off.Not())
             is_off[w].append(off)
 
-    # Contrainte de couverture horaire
     for d in range(DAYS):
         need = weekly_chef_need[day_names[d]]
         for h in range(HOURS_PER_DAY):
@@ -52,8 +50,4 @@ def generate_planning(num_workers, weekly_chef_need, output_path="planning.xlsx"
             row.update({hour_labels[h]: ("✅" if h in worked_hours else "") for h in range(HOURS_PER_DAY)})
             planning.append(row)
 
-    df = pd.DataFrame(planning)
-    with pd.ExcelWriter(output_path) as writer:
-        df.to_excel(writer, index=False, sheet_name="Planning")
-
-    return output_path
+    return pd.DataFrame(planning)
