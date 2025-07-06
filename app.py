@@ -2,45 +2,49 @@ import streamlit as st
 import pandas as pd
 from planning_core import generate_planning
 
-st.set_page_config(page_title="Planning Melagodo", layout="wide")
-st.title("📅 Générateur de planning pour Melagodo")
+st.set_page_config(page_title="Planning Restaurant", layout="wide")
 
-# ------------------ 1. Configurer les jours et heures
-DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-HOURS = [f"{h}:00" for h in range(10, 24)]
+st.title("📅 Générateur de planning pour restaurant")
 
-# ------------------ 2. Créer le tableau initial si aucun fichier n'est chargé
-default_data = {hour: [0] * len(DAYS) for hour in HOURS}
-default_data["Jour"] = DAYS
-df = pd.DataFrame(default_data)
-df = df[["Jour"] + HOURS]  # Réorganiser colonnes
+# 1️⃣ Téléverser un fichier de besoins
+uploaded_file = st.file_uploader("1️⃣ Charger le fichier de besoins (Excel)", type=["xlsx"])
 
-st.header("📝 Modifier les besoins horaires par jour et créneau horaire")
-edited_df = st.data_editor(df, num_rows="fixed", use_container_width=True)
+if uploaded_file:
+    besoins_df = pd.read_excel(uploaded_file)
+    st.success("✅ Fichier chargé avec succès.")
+else:
+    # Exemple de tableau par défaut
+    besoins_df = pd.DataFrame({
+        "Jour": ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"],
+        **{f"{h}:00": [1]*7 for h in range(10, 24)}  # Besoins de 10h à 23h
+    })
+    st.info("ℹ️ Aucun fichier importé, modèle par défaut utilisé.")
 
-# ------------------ 3. Choisir le nombre d'employés
-st.header("👨‍🍳 Nombre d’employés disponibles")
+# 2️⃣ Modifier les besoins horaires
+st.subheader("2️⃣ Modifier les besoins horaires")
+editable_df = st.data_editor(besoins_df, num_rows="dynamic", use_container_width=True)
+
+# 3️⃣ Nombre d’employés disponibles
+st.subheader("3️⃣ Nombre d’employés disponibles")
 num_workers = st.slider("Sélectionner le nombre d'employés", min_value=1, max_value=20, value=6)
 
-# ------------------ 4. Générer le planning
-if st.button("📊 Générer le planning"):
-    try:
-        # Préparer les besoins sous forme de dict
-        weekly_chef_need = {row["Jour"]: [int(row[h]) for h in HOURS] for _, row in edited_df.iterrows()}
-        planning_df = generate_planning(num_workers, weekly_chef_need)
+# 4️⃣ Générer le planning
+if st.button("4️⃣ Générer le planning"):
+    with st.spinner("⏳ Génération du planning..."):
+        try:
+            # Créer le dictionnaire des besoins
+            weekly_chef_need = {}
+            for _, row in editable_df.iterrows():
+                jour = row["Jour"]
+                heures = [int(row[f"{h}:00"]) for h in range(10, 24)]
+                weekly_chef_need[jour] = heures
 
-        if planning_df is not None:
-            st.success("✅ Planning généré avec succès !")
-            st.dataframe(planning_df, use_container_width=True)
+            # Générer le planning
+            output_path = generate_planning(num_workers, weekly_chef_need)
 
-            # Export Excel
-            st.download_button(
-                label="📥 Télécharger le planning (Excel)",
-                data=planning_df.to_excel(index=False),
-                file_name="planning_melagodo.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-            st.error("❌ Aucun planning trouvé. Essayez d’ajuster les besoins ou le nombre d’employés.")
-    except Exception as e:
-        st.error(f"Erreur : {e}")
+            st.success("✅ Planning généré avec succès.")
+            with open(output_path, "rb") as file:
+                st.download_button("📥 Télécharger le planning Excel", data=file, file_name="planning.xlsx")
+
+        except Exception as e:
+            st.error(f"❌ Erreur : {e}")
